@@ -12,10 +12,7 @@ def median(img):
     new = np.zeros((m,n))
     for r in range(m):
         for c in range(n):
-            #A = img[r-5:r+6, c-5:c+6]
             A = img[r:r+11, c:c+11]
-            #print(A)
-            #new[r,c] = np.median(img[r-5:r+6, c-5:c+6])
             new[r,c] = np.median(A)
     return new
 
@@ -38,7 +35,6 @@ def IMR(img):
     cand = np.array(center_of_mass(img, lbl[0], range(lbl[1]))) #candidates to IMR centroid
     center = np.array([img.shape[0], img.shape[1]])/2.0 #center of image
     dist_to_center = np.sum((cand-np.ones(np.array(cand.shape))*center)**2, axis=1) #distance to center of each candidate
-    print(dist_to_center)
     centroidIdx = np.argmin(dist_to_center[1:])
     img[lbl[0]!=centroidIdx+1] = -1
     img[lbl[0]==centroidIdx+1] = 0
@@ -52,7 +48,8 @@ def norm2(arr):
     for i in range(a):
         norms[i] = arr[i][0]**2+arr[i][1]**2
 
-img = cv2.imread('C:\\Users\\juanc\\Documents\\Servicio\\CIO\\139001-17-M.png', 0)
+#def ajuste(arr)
+img = cv2.imread('139001-17-M.png', 0)
 
 new = median(img)
 new = threshold(new)

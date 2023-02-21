@@ -3,14 +3,15 @@ import numpy as np
 from matplotlib import pyplot as plt
 from numba import jit, njit
 from scipy.ndimage import center_of_mass, label
+
 import time
 
 inicio = time.time()
 
-#@njit
-def clip(img):
-    xSect = int(np.round_(.28*np.shape(img)[0]))
-    ySect = int(np.round_(.15*np.shape(img)[1]))
+@njit
+def clip(img, xSect, ySect):
+    #xSect = int(np.round_(.28*np.shape(img)[0]))
+    #ySect = int(np.round_(.15*np.shape(img)[1]))
     newImg = img[xSect:-xSect,ySect:-ySect]
     return newImg, [xSect, ySect]
 
@@ -31,16 +32,16 @@ def threshold(img):
     suma = 0
     for i in range(256):
         suma += np.count_nonzero(img==i)/(img.shape[0]*img.shape[1])
-        if suma > .3:
+        if suma > .2:
             T = i
             break
     
     for r in range(img.shape[0]):
         for c in range(img.shape[1]):
             if img[r,c] < T:
-                img[r,c] = 0
-            else:
                 img[r,c] = 255
+            else:
+                img[r,c] = 0
     """
     img[img<T] = 0
     img[img>=T] = 255
@@ -48,19 +49,20 @@ def threshold(img):
     return img
 
 def IMR(img):
-    """
+    
     sh = np.shape(img)
+    """
     for r in sh[0]:
         for c in sh[1]:
             if img[r,c] == 0:
     """
-    img[img==0] = 1
-    img[img==255] = 0
+    #img[img==0] = 1
+    #img[img==255] = 0
     lbl = label(img)
-    #np.seterr(divide='ignore', invalid='ignore')
-    cand = np.array(center_of_mass(img, lbl[0], range(lbl[1]))) #candidates to IMR centroid
+    lbl = label(removeSpots(lbl[0], lbl[1], int(np.round_(sh[0]*sh[1]*0.02))))
+    cand = np.array(center_of_mass(img, lbl[0], range(lbl[1]))) #candidates to IMR centroids
     #np.seterr(divide='warn', invalid='warn')
-    center = np.array([img.shape[0], img.shape[1]])/2.0 #center of image
+    center = np.array([sh[0], sh[1]])/2.0 #center of image
     dist_to_center = np.sum((cand-np.ones(np.array(cand.shape))*center)**2, axis=1) #distance to center of each candidate
     centroidIdx = np.argmin(dist_to_center[1:])
     img[lbl[0]!=centroidIdx+1] = -1
@@ -68,7 +70,17 @@ def IMR(img):
     img[img==-1] = 0
     
     return img
-
+@jit
+def removeSpots(lbl, spots, ths):
+    sh = np.shape(lbl)
+    for i in range(spots):
+        if np.count_nonzero(lbl==i)<ths:
+            for r in range(sh[0]):
+                for c in range(sh[1]):
+                    if lbl[r,c]==i:
+                        lbl[r,c] = 0
+            #lbl[lbl==i] = 0
+    return lbl
 #@jit
 def ajuste(arr, perc):
     regionIMR = np.where(arr==255)
@@ -89,7 +101,7 @@ def ajuste(arr, perc):
 def sampleInfo(float(size), float(perc)):
     return int(np.floor(perc*size))
 """
-@jit
+@njit
 def sobel(img):
     m = np.shape(img)[0]-2
     n = np.shape(img)[1]-2
@@ -124,7 +136,7 @@ def curveIntensity(img, poly, offset, imrRange):
     sh = np.shape(img)
     result = []
 
-    for y in range(101):
+    for y in range(151):
         totalIntensity = 0
         for c in range(imrRange[0], imrRange[1]+1):
             x = int(np.round_(poly(c)-y-offset[0]))
@@ -134,20 +146,24 @@ def curveIntensity(img, poly, offset, imrRange):
         result.append(totalIntensity)
     return result
 
-im1 = '//home//juancho//Documents//Servicio//CIO//139001-17-M.png'
-im2 = '//home//juancho//Downloads//138785-21-M.png'
-im3 = '//home//juancho//Downloads//138943-20-M.png'
-im4 = '//home//juancho//Downloads//139008-22-H.png'
+im1 = '//home//juancho//Documents//Servicio//CIO//Imagenes//139001-17-M.png'
+im2 = '//home//juancho//Documents//Servicio//CIO//Imagenes//138785-21-M.png'
+im3 = '//home//juancho//Documents//Servicio//CIO//Imagenes//138943-20-M.png'
+im4 = '//home//juancho//Documents//Servicio//CIO//Imagenes//139008-22-H.png'
 
 img = cv2.imread(im4, 0)
-clippedImg, offset = clip(img)
+xSect = int(np.round_(.28*np.shape(img)[0]))
+ySect = int(np.round_(.15*np.shape(img)[1]))
+clippedImg, offset = clip(img, xSect, ySect)
 
 new = median(img)
 new = threshold(new)
-new = IMR(new)
-poly, imrRange = ajuste(new, .1)
+imrImg = IMR(new)
+poly, imrRange = ajuste(imrImg, .15)
 
+#new = cv2.equalizeHist(cv2.Sobel(clippedImg, ddepth=-1,dx=1,dy=1,ksize=3))
 new = sobel(clippedImg)
+
 intensities = curveIntensity(new, poly, offset, imrRange)
 intensities1 = curveIntensity(clippedImg, poly, offset, imrRange)
 """
@@ -190,9 +206,11 @@ plt.plot(x, poly(x))
 plt.plot(x, poly(x)-minIntensidadIdx, color="r")
 
 f2 = plt.figure(2)
-plt.imshow(new, cmap='gray')
-plt.plot(x-offset[0], poly(x)-offset[1])
-plt.plot(x-offset[0], poly(x)-offset[1]-minIntensidadIdx, color="r")
+plt.imshow(imrImg, cmap='gray')
+#plt.plot(x-offset[0], poly(x)-offset[1])
+#plt.plot(x-offset[0], poly(x)-offset[1]-minIntensidadIdx, color="r")
+plt.plot(x, poly(x))
+plt.plot(x, poly(x)-minIntensidadIdx, color="r")
 
 plt.show()
 #f, a = plt.subplots(1,1)

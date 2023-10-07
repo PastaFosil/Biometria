@@ -1,4 +1,4 @@
-# Biometria
+# Denture biometrics
 
 This repository contains all of the code used for the project on automating the analysis of dental radiographies in order to take biometrical measurements of the dental pieces, by J.C. Perez-Ramirez, under the supervision of Dr. F.C Cuevas de la Rosa.
 
